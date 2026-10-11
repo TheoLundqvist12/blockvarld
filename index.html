@@ -1,0 +1,1178 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blockvärld – Minecraft-liknande spel</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; width: 100%; height: 100%;
+      overflow: hidden; font-family: system-ui, Arial, sans-serif;
+      background: #87ceeb; color: white;
+    }
+
+    #game { display: block; width: 100vw; height: 100vh; }
+    #hud {
+      position: fixed; inset: 0;
+      pointer-events: none;
+      text-shadow: 0 2px 3px #222;
+    }
+    #top {
+      position: absolute; top: 12px; left: 12px; right: 12px;
+      display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;
+    }
+    .panel {
+      background: rgba(17,17,17,0.7);
+      border: 1px solid rgba(255,255,255,0.45);
+      border-radius: 10px; padding: 10px 12px;
+      backdrop-filter: blur(4px);
+    }
+    #help { max-width: 360px; line-height: 1.45; font-size: 12px; }
+    #stats { font-size: 13px; text-align: right; }
+    #crosshair {
+      position: absolute; left: 50%; top: 50%;
+      transform: translate(-50%,-50%);
+      font-size: 24px; font-weight: 700;
+    }
+
+    #hotbar {
+      position: absolute; bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; gap: 5px; flex-wrap: wrap;
+      max-width: calc(100vw - 30px); justify-content: center;
+    }
+    .slot {
+      width: 50px; height: 50px; border: 2px solid rgba(255,255,255,0.7);
+      border-radius: 7px; background: rgba(17,17,17,0.7);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: 8px; line-height: 1.1;
+    }
+    .slot.selected { border: 3px solid white; background: rgba(255,255,255,0.35); transform: translateY(-5px); }
+    .swatch {
+      width: 20px; height: 20px; border: 1px solid rgba(0,0,0,0.6);
+      border-radius: 2px; margin-bottom: 2px;
+    }
+
+    #overlay {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 100;
+    }
+    #card {
+      width: min(680px, calc(100vw - 32px));
+      background: rgba(24, 37, 31, 0.95);
+      border: 2px solid rgba(255,255,255,0.5);
+      border-radius: 18px; padding: 26px;
+      box-shadow: 0 20px 80px rgba(0,0,0,0.6);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    #card h1 { margin: 0 0 8px; font-size: clamp(30px, 5vw, 44px); }
+    #card p { line-height: 1.5; margin: 8px 0; }
+    button {
+      cursor: pointer; color: white; background: #3b8d45;
+      border: 0; border-radius: 9px; padding: 12px 18px;
+      font-weight: 700; font-size: 16px;
+    }
+    button:hover { background: #4eaa58; }
+
+    .settings-group {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 14px;
+      margin: 10px 0;
+    }
+
+    .setting-item {
+      margin: 10px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .setting-item label {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .setting-item input[type="text"],
+    .setting-item input[type="number"],
+    .setting-item select {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(0,0,0,0.3);
+      color: white;
+      font-size: 14px;
+      font-family: monospace;
+    }
+
+    .seed-display {
+      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-family: monospace;
+      color: #7fff7f;
+      margin-top: 6px;
+    }
+
+    .checkbox-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-wrapper input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .seed-info {
+      font-size: 12px;
+      color: rgba(255,255,255,0.7);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    #gameMenu {
+      position: fixed; top: 80px; right: 12px;
+      width: min(380px, calc(100vw - 24px));
+      background: rgba(23,37,31,0.96);
+      border: 1px solid rgba(255,255,255,0.55);
+      border-radius: 12px; padding: 14px;
+      display: none; pointer-events: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+      max-height: calc(100vh - 100px); overflow-y: auto;
+      z-index: 40;
+    }
+    #gameMenu h2 { margin: 0 0 8px; font-size: 19px; }
+    #gameMenu h3 { margin-top: 12px; margin-bottom: 8px; font-size: 13px; }
+    #inventoryList {
+      font-size: 11px; line-height: 1.5; margin: 8px 0; max-height: 150px; overflow-y: auto;
+    }
+    #gameMenu button {
+      font-size: 11px; padding: 6px 10px; margin: 2px 2px 2px 0;
+      width: 100%; text-align: left;
+      background: rgba(57, 107, 71, 0.9);
+    }
+    #statusBar {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      bottom: 90px; background: rgba(17,17,17,0.75);
+      border-radius: 8px; padding: 5px 10px; font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .dimension-indicator {
+      position: absolute; top: 12px; right: 12px;
+      background: rgba(17,17,17,0.7);
+      border: 1px solid rgba(255,255,255,0.45);
+      border-radius: 10px; padding: 8px 12px;
+      font-size: 13px; font-weight: 600;
+    }
+
+    @media (pointer: coarse) {
+      #help { max-width: 220px; font-size: 11px; }
+      .slot { width: 40px; height: 40px; }
+      #card { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div id="top">
+      <div id="help" class="panel">
+        <b>Så spelar du</b><br>
+        W A S D = gå · Mellanslag = hoppa<br>
+        Mus = titta · Alt = bryt block · Z = placera<br>
+        1–9 = välj block · E = inventarie · T = handla<br>
+        P = portal · C = fuskläge · Esc = släpp musen
+      </div>
+      <div id="stats" class="panel">BLOCKVÄRLD<br><span id="coords">Laddar världen…</span></div>
+    </div>
+
+    <div class="dimension-indicator" id="dimensionIndicator">🌍 Övervärlden</div>
+
+    <div id="crosshair">+</div>
+    <div id="statusBar">❤ 20/20　🍗 20/20　Dag　🧟 0</div>
+    <div id="hotbar"></div>
+  </div>
+
+  <div id="gameMenu">
+    <h2>🎒 Inventarie</h2>
+    <div id="inventoryList"></div>
+
+    <h3>⛏️ Malmer & Ädelmetaller</h3>
+    <button id="cheatAllOres">Ge alla malmer</button>
+
+    <h3>🌳 Trätyper</h3>
+    <button id="cheatAllWood">Ge alla trätyper</button>
+
+    <h3>🪨 Sten & Mark</h3>
+    <button id="cheatAllStone">Ge alla stentyper</button>
+
+    <h3>🎨 Färgade Block</h3>
+    <button id="cheatAllColored">Ge alla färgade block</button>
+
+    <h3>🌿 Växter & Organiskt</h3>
+    <button id="cheatAllOrganic">Ge växter & material</button>
+
+    <h3>🔧 Fuskkommandon</h3>
+    <button id="cheatGiveAll">Ge ALLT (alla block)</button>
+    <button id="cheatHeal">Hela mig helt</button>
+
+    <h3>💾 Spara</h3>
+    <button id="saveWorld">Spara världen</button>
+    <button id="loadWorld">Ladda sparning</button>
+    <button id="closeMenu">Stäng (E)</button>
+  </div>
+
+  <div id="overlay">
+    <div id="card">
+      <h1>🟩 Blockvärld - Fullständig Edition</h1>
+      <p>Utforska en stor värld med <b>150+ block</b> från alla kategorier: Malmer, Trätyper, Sten, Växter och mer!</p>
+      <p>💥 Med Nether, The End, och alla Minecraft-block!</p>
+      
+      <div class="settings-group">
+        <h2 style="margin: 0 0 14px; font-size: 18px;">⚙️ Världsinställningar</h2>
+        
+        <div class="setting-item">
+          <label for="seedInput">🌱 Seed</label>
+          <input 
+            id="seedInput" 
+            type="text" 
+            placeholder="Lämna tomt för slumpat frö"
+            value=""
+          >
+          <div class="seed-display" id="seedDisplay">Seed: random</div>
+        </div>
+
+        <div class="setting-item">
+          <label for="difficultySelect">⚔️ Svårighetsgrad</label>
+          <select id="difficultySelect">
+            <option value="0">Fredlig</option>
+            <option value="1">Lätt</option>
+            <option value="2" selected>Normal</option>
+            <option value="3">Svår</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <label for="worldTypeSelect">🌍 Världstyp</label>
+          <select id="worldTypeSelect">
+            <option value="default" selected>Standard</option>
+            <option value="flat">Platt</option>
+            <option value="mountains">Bergiga</option>
+            <option value="islands">Övärldar</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <div class="checkbox-wrapper">
+            <input id="keepInventory" type="checkbox">
+            <label for="keepInventory" style="margin: 0;">📦 Keep Inventory</label>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="checkbox-wrapper">
+            <input id="enableCheat" type="checkbox">
+            <label for="enableCheat" style="margin: 0;">🎮 Fuskläge (C)</label>
+          </div>
+        </div>
+      </div>
+
+      <button id="start" style="width: 100%; padding: 14px 18px; font-size: 18px; margin-top: 10px;">
+        🎮 Starta spelet
+      </button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script>
+    (() => {
+      const canvas = document.getElementById('game');
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87ceeb);
+      scene.fog = new THREE.Fog(0x87ceeb, 35, 120);
+
+      const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 260);
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      scene.add(new THREE.HemisphereLight(0xd8efff, 0x52613c, 2));
+      const sun = new THREE.DirectionalLight(0xffffff, 2.1);
+      sun.position.set(-12, 28, 10); sun.castShadow = true;
+      sun.shadow.mapSize.set(1024, 1024);
+      scene.add(sun);
+
+      const materials = {
+        grass: new THREE.MeshLambertMaterial({ color: 0x54a83e }),
+        dirt: new THREE.MeshLambertMaterial({ color: 0x8a5935 }),
+        stone: new THREE.MeshLambertMaterial({ color: 0x858b91 }),
+        water: new THREE.MeshLambertMaterial({ color: 0x2a6fa6, transparent: true, opacity: 0.7 }),
+        lava: new THREE.MeshLambertMaterial({ color: 0xff6b1a, emissive: 0xff4400 }),
+        sand: new THREE.MeshLambertMaterial({ color: 0xdac47b }),
+        gravel: new THREE.MeshLambertMaterial({ color: 0x9a8a7a }),
+        clay: new THREE.MeshLambertMaterial({ color: 0xa19b8f }),
+
+        coal: new THREE.MeshLambertMaterial({ color: 0x1a1a1a }),
+        copper: new THREE.MeshLambertMaterial({ color: 0xb87333 }),
+        iron: new THREE.MeshLambertMaterial({ color: 0xbab0ac }),
+        gold: new THREE.MeshLambertMaterial({ color: 0xffd700 }),
+        lapis: new THREE.MeshLambertMaterial({ color: 0x1f47b6 }),
+        redstone: new THREE.MeshLambertMaterial({ color: 0xc51d28 }),
+        diamond: new THREE.MeshLambertMaterial({ color: 0x33ebcb }),
+        emerald: new THREE.MeshLambertMaterial({ color: 0x2ecc71 }),
+        quartzite: new THREE.MeshLambertMaterial({ color: 0xf5f5f5 }),
+        netherite: new THREE.MeshLambertMaterial({ color: 0x443a3b }),
+
+        oak: new THREE.MeshLambertMaterial({ color: 0x996333 }),
+        spruce: new THREE.MeshLambertMaterial({ color: 0x5a4a3a }),
+        birch: new THREE.MeshLambertMaterial({ color: 0xd4a574 }),
+        jungle: new THREE.MeshLambertMaterial({ color: 0xb4844a }),
+        acacia: new THREE.MeshLambertMaterial({ color: 0xe8834a }),
+        darkoak: new THREE.MeshLambertMaterial({ color: 0x3d2817 }),
+        mangrove: new THREE.MeshLambertMaterial({ color: 0xa34432 }),
+        cherry: new THREE.MeshLambertMaterial({ color: 0xd4a5a5 }),
+        bamboo: new THREE.MeshLambertMaterial({ color: 0xb8a860 }),
+        crimson: new THREE.MeshLambertMaterial({ color: 0x9e3f3f }),
+        warped: new THREE.MeshLambertMaterial({ color: 0x3f8e9e }),
+
+        cobblestone: new THREE.MeshLambertMaterial({ color: 0x7a7a7a }),
+        andesite: new THREE.MeshLambertMaterial({ color: 0x979797 }),
+        diorite: new THREE.MeshLambertMaterial({ color: 0xbfbfbf }),
+        granite: new THREE.MeshLambertMaterial({ color: 0xa5745a }),
+        tuff: new THREE.MeshLambertMaterial({ color: 0x6b6b54 }),
+        calcite: new THREE.MeshLambertMaterial({ color: 0xe8e8d8 }),
+        deepslate: new THREE.MeshLambertMaterial({ color: 0x3a3a47 }),
+        netherrack: new THREE.MeshLambertMaterial({ color: 0x6b3c2e }),
+        soulsand: new THREE.MeshLambertMaterial({ color: 0x5f4d3d }),
+        soilsoil: new THREE.MeshLambertMaterial({ color: 0x4a3d2d }),
+        blackstone: new THREE.MeshLambertMaterial({ color: 0x1a1a1a }),
+        basalt: new THREE.MeshLambertMaterial({ color: 0x3a3a42 }),
+        endstone: new THREE.MeshLambertMaterial({ color: 0xe8d8b5 }),
+        obsidian: new THREE.MeshLambertMaterial({ color: 0x0a0a1a }),
+
+        wool_white: new THREE.MeshLambertMaterial({ color: 0xffffff }),
+        wool_red: new THREE.MeshLambertMaterial({ color: 0xff3333 }),
+        wool_blue: new THREE.MeshLambertMaterial({ color: 0x3333ff }),
+        wool_green: new THREE.MeshLambertMaterial({ color: 0x33ff33 }),
+        wool_yellow: new THREE.MeshLambertMaterial({ color: 0xffff00 }),
+        concrete_white: new THREE.MeshLambertMaterial({ color: 0xf0f0f0 }),
+        concrete_red: new THREE.MeshLambertMaterial({ color: 0xee3333 }),
+        glass: new THREE.MeshLambertMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.55 }),
+        terracotta: new THREE.MeshLambertMaterial({ color: 0xb5651d }),
+
+        grass_block: new THREE.MeshLambertMaterial({ color: 0x54a83e }),
+        seagrass: new THREE.MeshLambertMaterial({ color: 0x2d7a2d }),
+        kelp: new THREE.MeshLambertMaterial({ color: 0x1f5f1f }),
+        flowers: new THREE.MeshLambertMaterial({ color: 0xff7bd5 }),
+        mushroom_red: new THREE.MeshLambertMaterial({ color: 0xff3333 }),
+        mushroom_brown: new THREE.MeshLambertMaterial({ color: 0x8b4513 }),
+        pumpkin: new THREE.MeshLambertMaterial({ color: 0xff9933 }),
+        melon: new THREE.MeshLambertMaterial({ color: 0x66cc33 }),
+        cactus: new THREE.MeshLambertMaterial({ color: 0x3d8d3a }),
+        sugarcane: new THREE.MeshLambertMaterial({ color: 0x7ab555 }),
+        vines: new THREE.MeshLambertMaterial({ color: 0x2d7a2d }),
+        leaves_oak: new THREE.MeshLambertMaterial({ color: 0x2f8039 }),
+        leaves_spruce: new THREE.MeshLambertMaterial({ color: 0x1a5a1a }),
+        netherwart: new THREE.MeshLambertMaterial({ color: 0x8b0000 }),
+
+        planks: new THREE.MeshLambertMaterial({ color: 0xb9824b }),
+        door: new THREE.MeshLambertMaterial({ color: 0x8b4513 }),
+        ladder: new THREE.MeshLambertMaterial({ color: 0xc9a76b }),
+        torch: new THREE.MeshLambertMaterial({ color: 0xffaa00, emissive: 0xff8800 }),
+        netherportal: new THREE.MeshLambertMaterial({ color: 0x6b2bd2, emissive: 0x5500ff }),
+        endportal: new THREE.MeshLambertMaterial({ color: 0x1a1a2e, emissive: 0x0a00ff }),
+
+        bone: new THREE.MeshLambertMaterial({ color: 0xf5f5dc }),
+        string: new THREE.MeshLambertMaterial({ color: 0x808080 }),
+        gunpowder: new THREE.MeshLambertMaterial({ color: 0x333333 }),
+        ink: new THREE.MeshLambertMaterial({ color: 0x1a1a1a }),
+        leather: new THREE.MeshLambertMaterial({ color: 0x664d2f }),
+        feather: new THREE.MeshLambertMaterial({ color: 0xf0f0f0 }),
+        meat: new THREE.MeshLambertMaterial({ color: 0x993333 }),
+      };
+
+      const blockTypes = [
+        'grass','dirt','stone','water','lava','sand','gravel','clay',
+        'coal','copper','iron','gold','lapis','redstone','diamond','emerald','quartzite','netherite',
+        'oak','spruce','birch','jungle','acacia','darkoak','mangrove','cherry','bamboo','crimson','warped',
+        'cobblestone','andesite','diorite','granite','tuff','calcite','deepslate','netherrack','soulsand','soilsoil','blackstone','basalt','endstone','obsidian',
+        'wool_white','wool_red','wool_blue','wool_green','wool_yellow','concrete_white','concrete_red','glass','terracotta',
+        'grass_block','seagrass','kelp','flowers','mushroom_red','mushroom_brown','pumpkin','melon','cactus','sugarcane','vines','leaves_oak','leaves_spruce','netherwart',
+        'planks','door','ladder','torch','netherportal','endportal','bone','string','gunpowder','ink','leather','feather'
+      ];
+
+      const blockLabels = {
+        grass: 'Gräs', dirt: 'Jord', stone: 'Sten', water: 'Vatten', lava: 'Lava', sand: 'Sand', gravel: 'Grus', clay: 'Lera',
+        coal: 'Kol', copper: 'Koppar', iron: 'Järn', gold: 'Guld', lapis: 'Lapis Lazuli', redstone: 'Rödsten', diamond: 'Diamant', emerald: 'Smaragd', quartzite: 'Kvarts', netherite: 'Netherite',
+        oak: 'Ek', spruce: 'Gran', birch: 'Björk', jungle: 'Djungelträ', acacia: 'Akacia', darkoak: 'Mörkersek', mangrove: 'Mangrove', cherry: 'Körsbärsträ', bamboo: 'Bambu', crimson: 'Crimson', warped: 'Warped',
+        cobblestone: 'Kullersten', andesite: 'Andesit', diorite: 'Diorit', granite: 'Granit', tuff: 'Tuff', calcite: 'Kalcit', deepslate: 'Djupskiffer', netherrack: 'Netherrack', soulsand: 'Själsand', soilsoil: 'Själa-jord', blackstone: 'Svartsten', basalt: 'Basalt', endstone: 'Endsten', obsidian: 'Obsidian',
+        wool_white: 'Vit ull', wool_red: 'Röd ull', wool_blue: 'Blå ull', wool_green: 'Grön ull', wool_yellow: 'Gul ull', concrete_white: 'Vit betong', concrete_red: 'Röd betong', glass: 'Glas', terracotta: 'Terracotta',
+        grass_block: 'Gräsblock', seagrass: 'Havsväxt', kelp: 'Tång', flowers: 'Blommor', mushroom_red: 'Röd svamp', mushroom_brown: 'Brun svamp', pumpkin: 'Pumpor', melon: 'Meloner', cactus: 'Kaktusar', sugarcane: 'Sockerrör', vines: 'Rankor', leaves_oak: 'Ekblad', leaves_spruce: 'Granblad', netherwart: 'Netherwart',
+        planks: 'Plankor', door: 'Dörr', ladder: 'Steg', torch: 'Fackla', netherportal: 'Nether-portal', endportal: 'Slut-portal', bone: 'Ben', string: 'Tråd', gunpowder: 'Krut', ink: 'Bläck', leather: 'Läder', feather: 'Fjädrar'
+      };
+
+      const itemColors = {
+        grass: '#54a83e', dirt: '#8a5935', stone: '#858b91', water: '#2a6fa6', lava: '#ff6b1a', sand: '#dac47b', gravel: '#9a8a7a', clay: '#a19b8f',
+        coal: '#1a1a1a', copper: '#b87333', iron: '#bab0ac', gold: '#ffd700', lapis: '#1f47b6', redstone: '#c51d28', diamond: '#33ebcb', emerald: '#2ecc71', quartzite: '#f5f5f5', netherite: '#443a3b',
+        oak: '#996333', spruce: '#5a4a3a', birch: '#d4a574', jungle: '#b4844a', acacia: '#e8834a', darkoak: '#3d2817', mangrove: '#a34432', cherry: '#d4a5a5', bamboo: '#b8a860', crimson: '#9e3f3f', warped: '#3f8e9e',
+        cobblestone: '#7a7a7a', andesite: '#979797', diorite: '#bfbfbf', granite: '#a5745a', tuff: '#6b6b54', calcite: '#e8e8d8', deepslate: '#3a3a47', netherrack: '#6b3c2e', soulsand: '#5f4d3d', soilsoil: '#4a3d2d', blackstone: '#1a1a1a', basalt: '#3a3a42', endstone: '#e8d8b5', obsidian: '#0a0a1a',
+        wool_white: '#ffffff', wool_red: '#ff3333', wool_blue: '#3333ff', wool_green: '#33ff33', wool_yellow: '#ffff00', concrete_white: '#f0f0f0', concrete_red: '#ee3333', glass: '#bfe8ff', terracotta: '#b5651d',
+        grass_block: '#54a83e', seagrass: '#2d7a2d', kelp: '#1f5f1f', flowers: '#ff7bd5', mushroom_red: '#ff3333', mushroom_brown: '#8b4513', pumpkin: '#ff9933', melon: '#66cc33', cactus: '#3d8d3a', sugarcane: '#7ab555', vines: '#2d7a2d', leaves_oak: '#2f8039', leaves_spruce: '#1a5a1a', netherwart: '#8b0000',
+        planks: '#b9824b', door: '#8b4513', ladder: '#c9a76b', torch: '#ffaa00', netherportal: '#8844ff', endportal: '#3344ff', bone: '#f5f5dc', string: '#808080', gunpowder: '#333333', ink: '#1a1a1a', leather: '#664d2f', feather: '#f0f0f0'
+      };
+
+      const blocks = new Map();
+      const mobs = [];
+
+      const hotbarOrder = blockTypes;
+
+      const inventoryState = {
+        hotbar: [],
+        backpack: Array(27).fill(null),
+        armor: { helmet: null, chestplate: null, leggings: null, boots: null },
+        selected: 0,
+        emeralds: 0
+      };
+
+      for (let i = 0; i < 9; i++) {
+        inventoryState.hotbar[i] = hotbarOrder[i] || null;
+      }
+
+      let WORLD_SEED = 12345;
+      let worldSeedString = '';
+      let difficulty = 2;
+      let worldType = 'default';
+      let keepInventory = false;
+      let enableCheat = false;
+      let gameStarted = false;
+      let currentDimension = 'overworld';
+
+      const dimensionBlocks = {
+        overworld: new Map(),
+        nether: new Map(),
+        end: new Map()
+      };
+
+      document.getElementById('seedInput').addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        if (val === '') {
+          document.getElementById('seedDisplay').textContent = 'Seed: random (genereras vid start)';
+        } else {
+          const hash = hashSeed(val);
+          document.getElementById('seedDisplay').textContent = `Seed: "${val}" → hash: ${hash}`;
+          WORLD_SEED = hash;
+          worldSeedString = val;
+        }
+      });
+
+      function hashSeed(str) {
+        if (!str) return Math.floor(Math.random() * 1000000);
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+          const char = str.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash = hash & hash;
+        }
+        return Math.abs(hash) % 1000000;
+      }
+
+      function addItemToInventory(item, count = 1) {
+        for (let i = 0; i < inventoryState.hotbar.length; i++) {
+          if (!inventoryState.hotbar[i]) {
+            inventoryState.hotbar[i] = item;
+            return true;
+          }
+        }
+        inventoryState.backpack.push(item);
+        return true;
+      }
+
+      function removeItemFromAny(item) {
+        for (let i = 0; i < inventoryState.hotbar.length; i++) {
+          if (inventoryState.hotbar[i] === item) {
+            inventoryState.hotbar[i] = null;
+            return true;
+          }
+        }
+        const idx = inventoryState.backpack.indexOf(item);
+        if (idx >= 0) {
+          inventoryState.backpack.splice(idx, 1);
+          return true;
+        }
+        return false;
+      }
+
+      function countItem(item) {
+        let count = 0;
+        for (const i of inventoryState.hotbar) if (i === item) count++;
+        for (const i of inventoryState.backpack) if (i === item) count++;
+        return count;
+      }
+
+      function selectedItemName() {
+        return inventoryState.hotbar[inventoryState.selected] || null;
+      }
+
+      function renderHotbar() {
+        const hotbar = document.getElementById('hotbar');
+        hotbar.innerHTML = '';
+
+        for (let i = 0; i < 9; i++) {
+          const item = inventoryState.hotbar[i];
+          const color = item ? itemColors[item] || '#555' : '#333';
+          const label = item ? (blockLabels[item] || item) : 'Tom';
+
+          const slot = document.createElement('div');
+          slot.className = 'slot' + (i === inventoryState.selected ? ' selected' : '');
+          slot.innerHTML = `
+            <div class="swatch" style="background:${color}"></div>
+            <span>${i + 1}</span>
+          `;
+          hotbar.appendChild(slot);
+        }
+      }
+
+      function renderInventory() {
+        const list = document.getElementById('inventoryList');
+        const items = [];
+        for (const item of inventoryState.hotbar) if (item) items.push(item);
+        for (const item of inventoryState.backpack) if (item) items.push(item);
+
+        const grouped = {};
+        for (const item of items) {
+          grouped[item] = (grouped[item] || 0) + 1;
+        }
+
+        list.innerHTML = Object.entries(grouped).length
+          ? Object.entries(grouped).map(([item, count]) => 
+              `<div><span style="display:inline-block;width:10px;height:10px;background:${itemColors[item] || '#555'};margin-right:6px;border:1px solid #0008"></span>${blockLabels[item] || item} ×${count}</div>`
+            ).join('')
+          : '<div>Tomt inventarie</div>';
+
+        const statusBar = document.getElementById('statusBar');
+        statusBar.textContent = `❤ ${health}/20　🍗 ${hunger}/20　${dayTime < 0.5 ? 'Dag ☀️' : 'Natt 🌙'}　🧟 ${zombieCount}`;
+      }
+
+      function setSelected(index) {
+        inventoryState.selected = index;
+        renderHotbar();
+      }
+
+      function seededRandom(x, y, z) {
+        const value = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + WORLD_SEED * 0.123) * 43758.5453;
+        return value - Math.floor(value);
+      }
+
+      function terrainHeight(x, z, dim = 'overworld') {
+        if (dim === 'nether') {
+          return 30 + Math.sin(x * 0.15) * 15 + Math.cos(z * 0.15) * 15;
+        }
+        if (dim === 'end') {
+          return 40 + Math.sin(x * 0.1) * 10 + Math.cos(z * 0.1) * 10;
+        }
+
+        if (worldType === 'flat') return 2;
+
+        if (worldType === 'mountains') {
+          const hills = Math.sin((x + WORLD_SEED) * 0.08) * 3.5 + Math.cos((z + WORLD_SEED) * 0.08) * 3.5;
+          const mountain = Math.max(0, 1 - Math.hypot(x + 12, z - 10) / 16) * 8;
+          return Math.max(-1, Math.floor(2 + hills + mountain));
+        }
+
+        if (worldType === 'islands') {
+          const island1 = Math.max(0, 1 - Math.hypot(x - 20, z - 20) / 12) * 5;
+          const island2 = Math.max(0, 1 - Math.hypot(x + 18, z - 15) / 14) * 6;
+          const island3 = Math.max(0, 1 - Math.hypot(x - 5, z + 22) / 10) * 4;
+          return Math.max(-3, Math.floor(1 + island1 + island2 + island3 + seededRandom(x, z, 999) * 2));
+        }
+
+        const hills = Math.sin((x + WORLD_SEED) * 0.13) * 2.2 + Math.cos((z + WORLD_SEED) * 0.16) * 1.8
+          + Math.sin((x + z + WORLD_SEED) * 0.09) * 1.5;
+        const mountain = Math.max(0, 1 - Math.hypot(x + 12, z - 10) / 18) * 5.5;
+        return Math.max(-1, Math.floor(2 + hills + mountain));
+      }
+
+      function biomeAt(x, z) {
+        if (x > 12 && z < 8) return 'desert';
+        if (x < -10 && z > 2) return 'snow';
+        if (Math.sin((x + WORLD_SEED) * 0.19) + Math.cos((z + WORLD_SEED) * 0.17) > 1.05) return 'forest';
+        return 'plains';
+      }
+
+      function addBlock(x, y, z, type) {
+        const dimBlocks = dimensionBlocks[currentDimension];
+        const k = key(x, y, z);
+        if (dimBlocks.has(k)) return;
+
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), materials[type] || materials.grass);
+        mesh.position.set(x, y, z);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        mesh.userData = { x, y, z, type };
+        scene.add(mesh);
+        dimBlocks.set(k, mesh);
+      }
+
+      function removeBlock(mesh) {
+        if (!mesh || !mesh.userData) return;
+        const dimBlocks = dimensionBlocks[currentDimension];
+        const k = key(mesh.userData.x, mesh.userData.y, mesh.userData.z);
+        scene.remove(mesh);
+        dimBlocks.delete(k);
+      }
+
+      function key(x, y, z) {
+        return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+      }
+
+      function buildWorld(dimension = 'overworld') {
+        currentDimension = dimension;
+        const dimBlocks = dimensionBlocks[dimension];
+
+        for (const mesh of dimBlocks.values()) scene.remove(mesh);
+        dimBlocks.clear();
+        mobs.length = 0;
+        zombieCount = 0;
+
+        const WORLD_RADIUS = 28;
+
+        if (dimension === 'overworld') {
+          for (let x = -WORLD_RADIUS; x <= WORLD_RADIUS; x++) {
+            for (let z = -WORLD_RADIUS; z <= WORLD_RADIUS; z++) {
+              const h = terrainHeight(x, z, 'overworld');
+              const biome = biomeAt(x, z);
+
+              for (let y = -5; y <= h; y++) {
+                let t = y === h ? 'grass' : (y < h - 3 ? 'stone' : 'dirt');
+
+                if (y === h && biome === 'desert') t = 'sand';
+                if (y === h && biome === 'snow' && h >= 4) t = 'stone';
+                if (y === h - 1 && biome === 'desert') t = 'sand';
+
+                if (y < h - 4 && y > -4 && seededRandom(x, y, z) < 0.08) {
+                  t = seededRandom(x + 10, y + 20, z + 5) > 0.5 ? 'water' : 'lava';
+                }
+
+                if (y < -3 && seededRandom(x, y, z) < 0.02) t = 'obsidian';
+                if (y < h - 5 && seededRandom(x, y + 100, z) < 0.01) t = 'coal';
+                if (y < h - 10 && seededRandom(x, y + 200, z) < 0.008) t = 'iron';
+                if (y < h - 15 && seededRandom(x, y + 300, z) < 0.005) t = 'gold';
+                if (y < h - 20 && seededRandom(x, y + 400, z) < 0.003) t = 'diamond';
+
+                addBlock(x, y, z, t);
+              }
+            }
+          }
+
+          for (let x = -WORLD_RADIUS + 2; x < WORLD_RADIUS - 2; x++) {
+            for (let z = -WORLD_RADIUS + 2; z < WORLD_RADIUS - 2; z++) {
+              const biome = biomeAt(x, z);
+              const r = seededRandom(x, z, WORLD_SEED);
+
+              if (biome === 'forest' && r < 0.12) {
+                const h = terrainHeight(x, z, 'overworld');
+                const treeHeight = 3 + (seededRandom(z, x, 11) > 0.5 ? 1 : 0);
+
+                for (let y = 1; y <= treeHeight; y++) addBlock(x, h + y, z, 'oak');
+                for (let dx = -2; dx <= 2; dx++) {
+                  for (let dz = -2; dz <= 2; dz++) {
+                    for (let dy = treeHeight - 1; dy <= treeHeight + 2; dy++) {
+                      const dist = Math.abs(dx) + Math.abs(dz) + (dy === treeHeight + 2 ? 1 : 0);
+                      if (dist < 5 && !(dx === 0 && dz === 0 && dy <= treeHeight)) addBlock(x + dx, h + dy, z + dz, 'leaves_oak');
+                    }
+                  }
+                }
+              }
+
+              if ((biome === 'plains' || biome === 'forest') && r < 0.08) {
+                const h = terrainHeight(x, z, 'overworld') + 1;
+                addBlock(x, h, z, 'flowers');
+              }
+            }
+          }
+
+          player.x = 0; player.z = 8; player.y = terrainHeight(0, 0, 'overworld') + 2.2;
+
+        } else if (dimension === 'nether') {
+          scene.background = new THREE.Color(0x3d0000);
+          scene.fog.color.copy(scene.background);
+
+          for (let x = -WORLD_RADIUS; x <= WORLD_RADIUS; x++) {
+            for (let z = -WORLD_RADIUS; z <= WORLD_RADIUS; z++) {
+              const h = terrainHeight(x, z, 'nether');
+
+              for (let y = 0; y <= h; y++) {
+                let t = 'netherrack';
+                if (seededRandom(x, y, z) < 0.15) t = 'soulsand';
+                if (seededRandom(x + 10, y + 10, z + 10) < 0.1) t = 'lava';
+                addBlock(x, y, z, t);
+              }
+            }
+          }
+
+          player.x = 0; player.z = 8; player.y = 30;
+
+        } else if (dimension === 'end') {
+          scene.background = new THREE.Color(0x0a0a1a);
+          scene.fog.color.copy(scene.background);
+
+          for (let x = -WORLD_RADIUS; x <= WORLD_RADIUS; x++) {
+            for (let z = -WORLD_RADIUS; z <= WORLD_RADIUS; z++) {
+              const h = terrainHeight(x, z, 'end');
+
+              for (let y = 0; y <= h; y++) {
+                addBlock(x, y, z, 'endstone');
+              }
+            }
+          }
+
+          player.x = 0; player.z = 8; player.y = 50;
+        }
+
+        updateInventory(); renderHotbar();
+      }
+
+      function solidAt(x, y, z) {
+        const dimBlocks = dimensionBlocks[currentDimension];
+        const keyValue = key(Math.round(x), Math.round(y), Math.round(z));
+        if (!dimBlocks.has(keyValue)) return false;
+        const type = dimBlocks.get(keyValue).userData.type;
+        return type !== 'water' && type !== 'lava' && type !== 'netherportal' && type !== 'endportal';
+      }
+
+      function selectedBlockName() {
+        return hotbarOrder[inventoryState.selected] || 'grass';
+      }
+
+      const raycaster = new THREE.Raycaster();
+      raycaster.far = 6;
+
+      function targetBlock() {
+        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+        const dimBlocks = dimensionBlocks[currentDimension];
+        const hits = raycaster.intersectObjects([...dimBlocks.values()], false);
+        return hits[0] || null;
+      }
+
+      function mineBlock() {
+        const hit = targetBlock();
+        if (!hit) return;
+
+        const p = hit.object.position;
+        const dx = Math.abs(p.x - player.x);
+        const dz = Math.abs(p.z - player.z);
+        const dy = Math.abs(p.y - player.y);
+        if (dx < 0.8 && dz < 0.8 && dy < 1.8) return;
+
+        const type = hit.object.userData.type;
+        if (!['water', 'lava', 'netherportal', 'endportal'].includes(type)) {
+          addItemToInventory(type);
+        }
+
+        removeBlock(hit.object);
+        renderInventory(); renderHotbar();
+      }
+
+      function placeBlock() {
+        const hit = targetBlock();
+        if (!hit) return;
+
+        const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+        const p = hit.object.position;
+        const x = Math.round(p.x + normal.x);
+        const y = Math.round(p.y + normal.y);
+        const z = Math.round(p.z + normal.z);
+
+        const selected = selectedBlockName();
+        if (!selected) return;
+
+        if (Math.abs(x - player.x) < 0.8 && Math.abs(z - player.z) < 0.8 && Math.abs(y - player.y) < 1.8) return;
+
+        const dimBlocks = dimensionBlocks[currentDimension];
+        if (!dimBlocks.has(key(x, y, z))) {
+          addBlock(x, y, z, selected);
+
+          const idx = inventoryState.hotbar.indexOf(selected);
+          if (idx >= 0) inventoryState.hotbar[idx] = null;
+          renderHotbar();
+          renderInventory();
+        }
+      }
+
+      function tryEnterPortal() {
+        const hit = targetBlock();
+        if (!hit) return;
+
+        const type = hit.object.userData.type;
+        if (type === 'netherportal') {
+          buildWorld('nether');
+          document.getElementById('dimensionIndicator').textContent = '🔥 Nethern';
+          return;
+        }
+        if (type === 'endportal') {
+          buildWorld('end');
+          document.getElementById('dimensionIndicator').textContent = '💀 The End';
+          return;
+        }
+      }
+
+      const player = {
+        x: 0, y: 10, z: 8, vy: 0, onGround: false, vx: 0, vz: 0
+      };
+
+      let yaw = 0, pitch = 0, locked = false;
+      const keys = {};
+      let jumpWasDown = false;
+      let health = 20;
+      let hunger = 20;
+      let dayTime = 0;
+      let survivalTick = 0;
+      let zombieCount = 0;
+
+      document.getElementById('start').addEventListener('click', () => {
+        const seedInput = document.getElementById('seedInput').value.trim();
+        
+        if (seedInput === '') {
+          WORLD_SEED = Math.floor(Math.random() * 1000000);
+          worldSeedString = '';
+        } else {
+          WORLD_SEED = hashSeed(seedInput);
+          worldSeedString = seedInput;
+        }
+
+        difficulty = Number(document.getElementById('difficultySelect').value);
+        worldType = document.getElementById('worldTypeSelect').value;
+        keepInventory = document.getElementById('keepInventory').checked;
+        enableCheat = document.getElementById('enableCheat').checked;
+
+        document.getElementById('overlay').style.display = 'none';
+        buildWorld('overworld');
+        gameStarted = true;
+        canvas.requestPointerLock?.();
+      });
+
+      document.getElementById('cheatAllOres').onclick = () => {
+        const ores = ['coal','copper','iron','gold','lapis','redstone','diamond','emerald','quartzite','netherite'];
+        for (const ore of ores) {
+          for (let i = 0; i < 15; i++) addItemToInventory(ore);
+        }
+        renderInventory(); renderHotbar();
+      };
+
+      document.getElementById('cheatAllWood').onclick = () => {
+        const woods = ['oak','spruce','birch','jungle','acacia','darkoak','mangrove','cherry','bamboo','crimson','warped'];
+        for (const wood of woods) {
+          for (let i = 0; i < 10; i++) addItemToInventory(wood);
+        }
+        renderInventory(); renderHotbar();
+      };
+
+      document.getElementById('cheatAllStone').onclick = () => {
+        const stones = ['stone','cobblestone','andesite','diorite','granite','tuff','calcite','deepslate','netherrack','soulsand','soilsoil','blackstone','basalt','endstone','obsidian'];
+        for (const stone of stones) {
+          for (let i = 0; i < 10; i++) addItemToInventory(stone);
+        }
+        renderInventory(); renderHotbar();
+      };
+
+      document.getElementById('cheatAllColored').onclick = () => {
+        const colored = ['wool_white','wool_red','wool_blue','wool_green','wool_yellow','concrete_white','concrete_red','glass','terracotta'];
+        for (const col of colored) {
+          for (let i = 0; i < 8; i++) addItemToInventory(col);
+        }
+        renderInventory(); renderHotbar();
+      };
+
+      document.getElementById('cheatAllOrganic').onclick = () => {
+        const organic = ['flowers','mushroom_red','mushroom_brown','pumpkin','melon','cactus','sugarcane','vines','leaves_oak','leaves_spruce','netherwart'];
+        for (const org of organic) {
+          for (let i = 0; i < 8; i++) addItemToInventory(org);
+        }
+        renderInventory(); renderHotbar();
+      };
+
+      document.getElementById('cheatGiveAll').onclick = () => {
+        for (const blockType of blockTypes) {
+          for (let i = 0; i < 20; i++) addItemToInventory(blockType);
+        }
+        renderInventory(); renderHotbar();
+        alert('🎮 Du har fått ALLT! 164 olika block × 20!');
+      };
+
+      document.getElementById('cheatHeal').onclick = () => {
+        health = 20; hunger = 20;
+        renderInventory();
+      };
+
+      document.addEventListener('keydown', (e) => {
+        keys[e.code] = true;
+
+        if (/^Digit[1-9]$/.test(e.code)) {
+          const n = Number(e.code.slice(5));
+          if (n >= 1 && n <= 9) setSelected(n - 1);
+        }
+
+        if (e.key.toLowerCase() === 'e') {
+          const menu = document.getElementById('gameMenu');
+          menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+          renderInventory();
+        }
+
+        if (e.key.toLowerCase() === 'p') tryEnterPortal();
+        if (e.key.toLowerCase() === 'c' && enableCheat) {
+          const menu = document.getElementById('gameMenu');
+          menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+          renderInventory();
+        }
+
+        if (e.code === 'Space') e.preventDefault();
+      });
+
+      document.addEventListener('keyup', (e) => keys[e.code] = false);
+
+      document.addEventListener('mousemove', (e) => {
+        if (!locked) return;
+        yaw -= e.movementX * 0.0022;
+        pitch -= e.movementY * 0.0022;
+        pitch = Math.max(-1.52, Math.min(1.52, pitch));
+      });
+
+      document.addEventListener('pointerlockchange', () => {
+        locked = document.pointerLockElement === canvas;
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.repeat) return;
+        if (e.key === 'Alt' || e.key === 'AltGraph') {
+          e.preventDefault();
+          mineBlock();
+        }
+        if (e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          placeBlock();
+        }
+      });
+
+      document.getElementById('closeMenu').onclick = () => {
+        document.getElementById('gameMenu').style.display = 'none';
+      };
+
+      document.getElementById('saveWorld').onclick = () => {
+        const data = {
+          seed: WORLD_SEED,
+          seedString: worldSeedString,
+          worldType,
+          difficulty,
+          keepInventory,
+          currentDimension,
+          player: { x: player.x, y: player.y, z: player.z },
+          health, hunger, dayTime,
+          hotbar: inventoryState.hotbar,
+          backpack: inventoryState.backpack,
+          blocksByDim: {}
+        };
+
+        for (const [dim, dimBlocks] of Object.entries(dimensionBlocks)) {
+          data.blocksByDim[dim] = [...dimBlocks.values()].map(m => ({ x: m.userData.x, y: m.userData.y, z: m.userData.z, type: m.userData.type }));
+        }
+
+        localStorage.setItem('blockvarld-save', JSON.stringify(data));
+        alert('✅ Världen är sparad!');
+      };
+
+      document.getElementById('loadWorld').onclick = () => {
+        const raw = localStorage.getItem('blockvarld-save');
+        if (!raw) { alert('❌ Ingen sparad värld hittades.'); return; }
+
+        try {
+          const data = JSON.parse(raw);
+          WORLD_SEED = data.seed || 12345;
+          worldSeedString = data.seedString || '';
+          worldType = data.worldType || 'default';
+          difficulty = data.difficulty || 2;
+          keepInventory = data.keepInventory || false;
+          currentDimension = data.currentDimension || 'overworld';
+
+          health = data.health || 20;
+          hunger = data.hunger || 20;
+          dayTime = data.dayTime || 0;
+
+          player.x = data.player.x;
+          player.y = data.player.y;
+          player.z = data.player.z;
+
+          inventoryState.hotbar = data.hotbar || Array(9).fill(null);
+          inventoryState.backpack = data.backpack || [];
+
+          for (const dim of ['overworld', 'nether', 'end']) {
+            dimensionBlocks[dim].clear();
+          }
+
+          for (const [dim, blocks] of Object.entries(data.blocksByDim || {})) {
+            currentDimension = dim;
+            blocks.forEach(b => addBlock(b.x, b.y, b.z, b.type));
+          }
+
+          currentDimension = data.currentDimension || 'overworld';
+          if (currentDimension === 'overworld') {
+            scene.background = new THREE.Color(0x87ceeb);
+            document.getElementById('dimensionIndicator').textContent = '🌍 Övervärlden';
+          } else if (currentDimension === 'nether') {
+            scene.background = new THREE.Color(0x3d0000);
+            document.getElementById('dimensionIndicator').textContent = '🔥 Nethern';
+          } else {
+            scene.background = new THREE.Color(0x0a0a1a);
+            document.getElementById('dimensionIndicator').textContent = '💀 The End';
+          }
+
+          renderHotbar();
+          renderInventory();
+          alert('✅ Sparad värld laddad!');
+        } catch {
+          alert('❌ Kunde inte läsa sparfilen.');
+        }
+      };
+
+      function movePlayer(dt) {
+        const forward = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
+        const side = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+        const speed = 5.4;
+
+        const targetVx = (-Math.sin(yaw) * forward + Math.cos(yaw) * side) * speed;
+        const targetVz = (-Math.cos(yaw) * forward - Math.sin(yaw) * side) * speed;
+
+        player.vx += (targetVx - player.vx) * 12 * dt;
+        player.vz += (targetVz - player.vz) * 12 * dt;
+        player.vx *= 0.84;
+        player.vz *= 0.84;
+
+        const dx = player.vx * dt;
+        const dz = player.vz * dt;
+
+        function blocked(nx, nz) {
+          const samples = [player.y - 0.9, player.y - 0.1, player.y + 0.65];
+          return samples.some(yy => solidAt(nx, yy, nz));
+        }
+
+        if (!blocked(player.x + dx, player.z)) player.x += dx;
+        if (!blocked(player.x, player.z + dz)) player.z += dz;
+
+        const jump = !!keys.Space;
+        if (jump && !jumpWasDown && player.onGround) {
+          player.vy = 7.3; player.onGround = false;
+        }
+        jumpWasDown = jump;
+
+        player.vy -= 18 * dt;
+        let nextY = player.y + player.vy * dt;
+
+        let groundTop = -Infinity;
+        for (let yy = Math.floor(player.y) - 3; yy <= Math.ceil(player.y); yy++) {
+          if (solidAt(Math.round(player.x), yy, Math.round(player.z))) {
+            groundTop = Math.max(groundTop, yy + 0.5);
+          }
+        }
+
+        const feet = nextY - 1.45;
+        if (player.vy <= 0 && groundTop > -Infinity && feet <= groundTop) {
+          nextY = groundTop + 1.45; player.vy = 0; player.onGround = true;
+        } else {
+          player.onGround = false;
+        }
+
+        player.y = nextY;
+
+        if (player.y < -20) {
+          if (keepInventory) {
+            health = 20; hunger = 20;
+          } else {
+            health = 20; hunger = 20;
+            inventoryState.hotbar = Array(9).fill(null);
+            inventoryState.backpack = [];
+          }
+          player.x = 0; player.y = terrainHeight(0, 0, currentDimension) + 2.2; player.z = 8;
+          renderHotbar(); renderInventory();
+        }
+      }
+
+      function updateCamera() {
+        camera.position.set(player.x, player.y, player.z);
+        camera.rotation.order = 'YXZ';
+        camera.rotation.y = yaw;
+        camera.rotation.x = pitch;
+      }
+
+      let previous = performance.now();
+
+      function animate(now) {
+        requestAnimationFrame(animate);
+
+        if (!gameStarted) return;
+
+        const dt = Math.min((now - previous) / 1000, 0.04);
+        previous = now;
+
+        dayTime = (dayTime + dt / 200) % 1;
+        movePlayer(dt);
+        updateCamera();
+
+        const nightFactor = (Math.sin(dayTime * Math.PI * 2 - Math.PI / 2) + 1) / 2;
+        const skyDay = new THREE.Color(0x87ceeb);
+        const skyNight = new THREE.Color(0x10182f);
+        
+        if (currentDimension === 'overworld') {
+          scene.background.copy(skyNight).lerp(skyDay, nightFactor);
+          scene.fog.color.copy(scene.background);
+          sun.intensity = 0.25 + 1.85 * (1 - nightFactor);
+        }
+
+        survivalTick += dt;
+        if (survivalTick > 18) {
+          survivalTick = 0;
+          if (hunger > 0) hunger--;
+          else health = Math.max(0, health - 1);
+        }
+
+        if (health <= 0) {
+          health = 20; hunger = 20;
+          player.x = 0; player.z = 8; player.y = terrainHeight(0, 0, currentDimension) + 2.2;
+          if (!keepInventory) {
+            inventoryState.hotbar = Array(9).fill(null);
+            inventoryState.backpack = [];
+          }
+        }
+
+        document.getElementById('coords').textContent =
+          `X ${player.x.toFixed(1)} · Y ${player.y.toFixed(1)} · Z ${player.z.toFixed(1)}`;
+
+        renderInventory();
+        renderer.render(scene, camera);
+      }
+
+      renderHotbar();
+      renderInventory();
+
+      window.addEventListener('resize', () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+      });
+
+      requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+</html>
